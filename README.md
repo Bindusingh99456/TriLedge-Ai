@@ -15,20 +15,20 @@
 
 ```mermaid
 graph TD
-    Client[📱 Web UI Frontend React 19 + Tailwind] -->|HTTPS Requests| Proxy[🛡️ Nginx Reverse Proxy / SSL Termination]
-    Proxy -->|Pass to Port 3000| API[🚀 Express.js API Node 20 Runtime]
+    Client["📱 Web UI Frontend React 19 + Tailwind"] -->|HTTPS Requests| Proxy["🛡️ Nginx Reverse Proxy / SSL Termination"]
+    Proxy -->|Pass to Port 3000| API["🚀 Express.js API Node 20 Runtime"]
     
     subgraph Core Engine Services
-        API -->|1. Structured JSON Logging| Logger[📜 Logger & Request Tracing]
-        API -->|2. Liveness & Readiness| Probes[/healthz & /ready Probes]
-        API -->|3. OpenAPI / Swagger| Docs[/docs Interactive UI]
-        API -->|4. Real-time Telemetry| SSE[📡 Server-Sent Events SSE Stream]
+        API -->|1. Structured JSON Logging| Logger["📜 Logger & Request Tracing"]
+        API -->|2. Liveness & Readiness| Probes["/healthz & /ready Probes"]
+        API -->|3. OpenAPI / Swagger| Docs["/docs Interactive UI"]
+        API -->|4. Real-time Telemetry| SSE["📡 Server-Sent Events SSE Stream"]
     end
 
     subgraph Data & Matching Layer
-        API -->|5. Row-Locked Batch Settlement| DB[(🐘 PostgreSQL 16 DB)]
-        API -->|6. Cache-Aside Stats| Redis[(⚡ Redis 7 Cache)]
-        API -->|7. Semantic Exception Audit| Gemini[🧠 Gemini 2.5 Flash AI Engine]
+        API -->|5. Row-Locked Batch Settlement| DB[("🐘 PostgreSQL 16 DB")]
+        API -->|6. Cache-Aside Stats| Redis[("⚡ Redis 7 Cache")]
+        API -->|7. Semantic Exception Audit| Gemini["🧠 Gemini 2.5 Flash AI Engine"]
     end
 ```
 
