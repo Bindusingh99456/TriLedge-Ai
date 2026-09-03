@@ -17,6 +17,7 @@ import { InspectorModal } from "./components/InspectorModal";
 import { CsvUploadModal } from "./components/CsvUploadModal";
 import { Toast } from "./components/Toast";
 import { LiveSseLogsDrawer } from "./components/LiveSseLogsDrawer";
+import { DlqModal } from "./components/DlqModal";
 
 import {
   ListFilter,
@@ -57,6 +58,7 @@ export default function App() {
   const [selectedTx, setSelectedTx] = useState<ReconciledTransaction | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isSseOpen, setIsSseOpen] = useState(false);
+  const [isDlqOpen, setIsDlqOpen] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -242,6 +244,7 @@ export default function App() {
         onExportReport={handleExportReport}
         matchRate={summary.matchRatePercentage}
         onOpenSseDrawer={() => setIsSseOpen(true)}
+        onOpenDlqModal={() => setIsDlqOpen(true)}
       />
 
       {/* Main Container */}
@@ -340,6 +343,12 @@ export default function App() {
       <LiveSseLogsDrawer
         isOpen={isSseOpen}
         onClose={() => setIsSseOpen(false)}
+      />
+
+      {/* Dead-Letter Queue & Circuit Breaker Modal */}
+      <DlqModal
+        isOpen={isDlqOpen}
+        onClose={() => setIsDlqOpen(false)}
       />
 
       {/* Footer */}

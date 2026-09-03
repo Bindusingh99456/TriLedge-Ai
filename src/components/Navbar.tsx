@@ -19,6 +19,7 @@ interface NavbarProps {
   onExportReport: () => void;
   matchRate: number;
   onOpenSseDrawer?: () => void;
+  onOpenDlqModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -28,7 +29,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   isAiLoading,
   onExportReport,
   matchRate,
-  onOpenSseDrawer
+  onOpenSseDrawer,
+  onOpenDlqModal
 }) => {
   const [systemReady, setSystemReady] = React.useState(true);
 
@@ -42,8 +44,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   return (
-    <header className="bg-[#0F172A] border-b border-slate-800 text-white sticky top-0 z-40 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="bg-[#0F172A] border-b border-slate-800 text-white sticky top-0 z-40 shadow-sm flex flex-col">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between w-full">
         
         {/* Brand & Subtitle */}
         <div className="flex items-center space-x-3">
@@ -89,6 +91,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="font-bold text-emerald-400">Live Stream</span>
           </button>
 
+          <button
+            onClick={onOpenDlqModal}
+            className="flex items-center space-x-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-md px-3 py-1.5 text-xs transition cursor-pointer text-amber-300"
+            title="View Dead-Letter Queue & AI Circuit Breaker Status"
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="font-medium">DLQ Queue & Circuit Breaker</span>
+          </button>
+
           <div className="flex items-center space-x-2 bg-slate-800/90 border border-slate-700 rounded-md px-3.5 py-1.5 text-xs">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <span className="text-slate-300 font-medium">Matched Payments:</span>
@@ -125,6 +136,32 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
+      </div>
+
+      {/* Enterprise Architecture Status Strip */}
+      <div className="bg-slate-900/90 border-t border-slate-800 py-1.5 px-4 text-[11px] text-slate-400">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="flex items-center space-x-1 text-slate-300">
+              <span className="text-emerald-400 font-bold">✓</span>
+              <span>Decimal Math: <strong className="text-white font-mono">Decimal.js NUMERIC(18,4)</strong></span>
+            </span>
+            <span className="flex items-center space-x-1 text-slate-300">
+              <span className="text-emerald-400 font-bold">✓</span>
+              <span>Idempotency Guard: <strong className="text-white font-mono">SET NX EX 120</strong></span>
+            </span>
+            <span className="flex items-center space-x-1 text-slate-300">
+              <span className="text-amber-400 font-bold">⚡</span>
+              <span>Circuit Breaker: <strong className="text-white font-mono">Opossum + DLQ Fallback</strong></span>
+            </span>
+          </div>
+
+          <div className="hidden md:flex items-center space-x-2 font-mono text-[10px] text-slate-400">
+            <span>Server: <span className="text-emerald-400">Express + Node 20</span></span>
+            <span>•</span>
+            <span>DB: <span className="text-sky-400">PostgreSQL 16</span></span>
+          </div>
+        </div>
       </div>
     </header>
   );
