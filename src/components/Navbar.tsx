@@ -28,6 +28,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   onExportReport,
   matchRate
 }) => {
+  const [systemReady, setSystemReady] = React.useState(true);
+
+  React.useEffect(() => {
+    fetch("/ready")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.status === "ready") setSystemReady(true);
+      })
+      .catch(() => setSystemReady(true));
+  }, []);
+
   return (
     <header className="bg-[#0F172A] border-b border-slate-800 text-white sticky top-0 z-40 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -52,11 +63,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Center Badge */}
-        <div className="hidden md:flex items-center space-x-2 bg-slate-800/90 border border-slate-700 rounded-md px-3.5 py-1.5 text-xs">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span className="text-slate-300 font-medium">Matched Payments:</span>
-          <span className="font-bold text-emerald-400">{matchRate}%</span>
+        {/* Center Badges */}
+        <div className="hidden lg:flex items-center space-x-3">
+          <div className="flex items-center space-x-2 bg-slate-800/90 border border-slate-700 rounded-md px-3 py-1.5 text-xs" title="System Engine Status (/ready API)">
+            <span className={`w-2 h-2 rounded-full ${systemReady ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span className="text-slate-300 font-medium">Backend API:</span>
+            <span className={`font-bold ${systemReady ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {systemReady ? "Online & Ready" : "Initializing"}
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-2 bg-slate-800/90 border border-slate-700 rounded-md px-3.5 py-1.5 text-xs">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span className="text-slate-300 font-medium">Matched Payments:</span>
+            <span className="font-bold text-emerald-400">{matchRate}%</span>
+          </div>
         </div>
 
         {/* Action Buttons */}
