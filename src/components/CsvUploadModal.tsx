@@ -189,17 +189,28 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
 
               {/* Upload 1: Razorpay CSV */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                <label className="text-xs font-bold text-indigo-700 block mb-1">
-                  1. Razorpay Settlement Report CSV
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-indigo-700">
+                    1. Razorpay Settlement Report CSV
+                  </label>
+                  <button
+                    onClick={() => setRzpCsvContent(`Payment_ID,Order_ID,Customer_Name,Customer_Email,Transaction_Amount,Gateway_Fee,Settlement_Amount,Settlement_Date,UTR_Reference,Status
+pay_RZP_00101,ORD-2026-1001,Aarav Sharma,aarav@example.com,12500,250,12250,2026-08-20,UTR98765432101,captured
+pay_RZP_00102,ORD-2026-1002,Priya Patel,priya@example.com,8400,168,8232,2026-08-20,UTR98765432102,captured
+pay_RZP_00103,ORD-2026-1003,Rohan Verma,rohan@example.com,15000,300,14700,2026-08-21,UTR98765432103,captured`)}
+                    className="text-[10px] bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold px-2 py-0.5 rounded border border-indigo-200 transition"
+                  >
+                    Insert Demo Text
+                  </button>
+                </div>
                 <input
                   type="file"
                   accept=".csv"
                   onChange={(e) => handleFileUpload(e, setRzpCsvContent)}
-                  className="text-xs text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 mb-2"
+                  className="text-xs text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 mb-2 cursor-pointer"
                 />
                 <textarea
-                  rows={2}
+                  rows={3}
                   placeholder="Payment_ID,Order_ID,Customer_Name,Transaction_Amount,Gateway_Fee,Settlement_Amount..."
                   value={rzpCsvContent}
                   onChange={(e) => setRzpCsvContent(e.target.value)}
@@ -209,17 +220,28 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
 
               {/* Upload 2: Bank Statement CSV */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                <label className="text-xs font-bold text-emerald-700 block mb-1">
-                  2. Core Bank Statement CSV
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-emerald-700">
+                    2. Core Bank Statement CSV
+                  </label>
+                  <button
+                    onClick={() => setBankCsvContent(`Bank_Ref,UTR_Number,Value_Date,Credit_Amount,Debit_Amount,Description,Bank_Code
+BNK-2026-9001,UTR98765432101,2026-08-20,12250,0,CMS/Razorpay/UTR98765432101/Aarav,HDFC00012
+BNK-2026-9002,UTR98765432102,2026-08-20,8232,0,CMS/Razorpay/UTR98765432102/Priya,HDFC00012
+BNK-2026-9003,UTR98765432103,2026-08-21,14700,0,CMS/Razorpay/UTR98765432103/Rohan,HDFC00012`)}
+                    className="text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold px-2 py-0.5 rounded border border-emerald-200 transition"
+                  >
+                    Insert Demo Text
+                  </button>
+                </div>
                 <input
                   type="file"
                   accept=".csv"
                   onChange={(e) => handleFileUpload(e, setBankCsvContent)}
-                  className="text-xs text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 mb-2"
+                  className="text-xs text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 mb-2 cursor-pointer"
                 />
                 <textarea
-                  rows={2}
+                  rows={3}
                   placeholder="Bank_Ref,UTR_Number,Value_Date,Credit_Amount,Description..."
                   value={bankCsvContent}
                   onChange={(e) => setBankCsvContent(e.target.value)}
@@ -229,17 +251,28 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
 
               {/* Upload 3: ERP Sales Ledger CSV */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                <label className="text-xs font-bold text-indigo-600 block mb-1">
-                  3. ERP Sales Ledger CSV
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-indigo-600">
+                    3. ERP Sales Ledger CSV
+                  </label>
+                  <button
+                    onClick={() => setErpCsvContent(`Invoice_ID,Order_ID,Sales_Date,Customer_Name,Expected_Amount,Refund_Amount,Net_Expected,Payment_Status
+INV-2026-1001,ORD-2026-1001,2026-08-20,Aarav Sharma,12500,0,12500,Paid
+INV-2026-1002,ORD-2026-1002,2026-08-20,Priya Patel,8400,0,8400,Paid
+INV-2026-1003,ORD-2026-1003,2026-08-21,Rohan Verma,15000,0,15000,Paid`)}
+                    className="text-[10px] bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold px-2 py-0.5 rounded border border-indigo-200 transition"
+                  >
+                    Insert Demo Text
+                  </button>
+                </div>
                 <input
                   type="file"
                   accept=".csv"
                   onChange={(e) => handleFileUpload(e, setErpCsvContent)}
-                  className="text-xs text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 mb-2"
+                  className="text-xs text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 mb-2 cursor-pointer"
                 />
                 <textarea
-                  rows={2}
+                  rows={3}
                   placeholder="Invoice_ID,Order_ID,Sales_Date,Customer_Name,Expected_Amount..."
                   value={erpCsvContent}
                   onChange={(e) => setErpCsvContent(e.target.value)}

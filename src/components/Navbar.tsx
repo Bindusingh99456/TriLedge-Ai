@@ -18,6 +18,7 @@ interface NavbarProps {
   isAiLoading: boolean;
   onExportReport: () => void;
   matchRate: number;
+  onOpenSseDrawer?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -26,7 +27,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onRunAiFuzzy,
   isAiLoading,
   onExportReport,
-  matchRate
+  matchRate,
+  onOpenSseDrawer
 }) => {
   const [systemReady, setSystemReady] = React.useState(true);
 
@@ -46,12 +48,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Brand & Subtitle */}
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-sm">
-            L
+            T
           </div>
           <div>
             <div className="flex items-center space-x-2">
               <h1 className="text-xl font-bold tracking-tight text-white">
-                LedgerSync
+                TriLedger AI
               </h1>
               <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full">
                 Payment Matcher
@@ -65,13 +67,27 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Center Badges */}
         <div className="hidden lg:flex items-center space-x-3">
-          <div className="flex items-center space-x-2 bg-slate-800/90 border border-slate-700 rounded-md px-3 py-1.5 text-xs" title="System Engine Status (/ready API)">
-            <span className={`w-2 h-2 rounded-full ${systemReady ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-            <span className="text-slate-300 font-medium">Backend API:</span>
-            <span className={`font-bold ${systemReady ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {systemReady ? "Online & Ready" : "Initializing"}
-            </span>
-          </div>
+          <a
+            href="/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center space-x-2 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 rounded-md px-3 py-1.5 text-xs transition"
+            title="Interactive OpenAPI / Swagger Documentation"
+          >
+            <span className="w-2 h-2 rounded-full bg-sky-400" />
+            <span className="text-slate-300 font-medium">API Docs:</span>
+            <span className="font-bold text-sky-400">/docs</span>
+          </a>
+
+          <button
+            onClick={onOpenSseDrawer}
+            className="flex items-center space-x-2 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 rounded-md px-3 py-1.5 text-xs transition cursor-pointer"
+            title="Open Live SSE Telemetry Stream"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-slate-300 font-medium">SSE Feed:</span>
+            <span className="font-bold text-emerald-400">Live Stream</span>
+          </button>
 
           <div className="flex items-center space-x-2 bg-slate-800/90 border border-slate-700 rounded-md px-3.5 py-1.5 text-xs">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />

@@ -15,6 +15,8 @@ import { ExceptionsQueue } from "./components/ExceptionsQueue";
 import { JournalLedger } from "./components/JournalLedger";
 import { InspectorModal } from "./components/InspectorModal";
 import { CsvUploadModal } from "./components/CsvUploadModal";
+import { Toast } from "./components/Toast";
+import { LiveSseLogsDrawer } from "./components/LiveSseLogsDrawer";
 
 import {
   ListFilter,
@@ -54,6 +56,7 @@ export default function App() {
   // Modals
   const [selectedTx, setSelectedTx] = useState<ReconciledTransaction | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isSseOpen, setIsSseOpen] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -238,6 +241,7 @@ export default function App() {
         isAiLoading={isAiLoading}
         onExportReport={handleExportReport}
         matchRate={summary.matchRatePercentage}
+        onOpenSseDrawer={() => setIsSseOpen(true)}
       />
 
       {/* Main Container */}
@@ -330,6 +334,12 @@ export default function App() {
         onClose={() => setIsUploadOpen(false)}
         onLoadPreset={handleLoadPreset}
         onCustomCsvUpload={handleCustomUpload}
+      />
+
+      {/* Live SSE Telemetry Drawer */}
+      <LiveSseLogsDrawer
+        isOpen={isSseOpen}
+        onClose={() => setIsSseOpen(false)}
       />
 
       {/* Footer */}

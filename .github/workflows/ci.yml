@@ -1,0 +1,55 @@
+name: Enterprise CI/CD Quality Assurance & Deployment Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  lint-typecheck-test:
+    name: 🛡️ Code Quality, Typecheck & Synthetic Seed Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Project Dependencies
+        run: npm ci
+
+      - name: Run TypeScript Linter & Static Type Analysis
+        run: npm run lint
+
+      - name: Verify Synthetic Data Generator & Seed Script
+        run: npm run seed
+
+      - name: Build Standalone Server & Client Bundles
+        run: npm run build
+
+      - name: Run Performance Benchmark Dry-Run
+        run: npx tsx scripts/benchmark.ts
+
+  docker-build-security:
+    name: 🐳 Docker Multi-Stage Build & Security Dry-Run
+    needs: lint-typecheck-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Container Image Dry-Run
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: ledgersync-app:ci-latest

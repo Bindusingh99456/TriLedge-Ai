@@ -1,5 +1,5 @@
 {
-  "name": "LedgerSync",
+  "name": "TriLedger AI",
   "description": "3-Way Payout & Gateway Exception Reconciler using deterministic financial rules and AI fuzzy matching",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
