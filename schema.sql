@@ -37,17 +37,27 @@ CREATE TABLE IF NOT EXISTS reconciled_transactions (
     match_type match_type_enum NOT NULL DEFAULT 'EXCEPTION_UNRESOLVED',
     confidence_score NUMERIC(5,2) NOT NULL DEFAULT 0.00,
     
-    -- Financial Equations
-    gross_amount NUMERIC(15,2) NOT NULL DEFAULT 0.00,
-    fee_deducted NUMERIC(15,2) NOT NULL DEFAULT 0.00,
-    refund_deducted NUMERIC(15,2) NOT NULL DEFAULT 0.00,
-    net_bank_received NUMERIC(15,2) NOT NULL DEFAULT 0.00,
-    variance NUMERIC(15,2) NOT NULL DEFAULT 0.00,
+    -- Financial Equations (Arbitrary-Precision NUMERIC(18,4))
+    gross_amount NUMERIC(18,4) NOT NULL DEFAULT 0.0000,
+    fee_deducted NUMERIC(18,4) NOT NULL DEFAULT 0.0000,
+    refund_deducted NUMERIC(18,4) NOT NULL DEFAULT 0.0000,
+    net_bank_received NUMERIC(18,4) NOT NULL DEFAULT 0.0000,
+    variance NUMERIC(18,4) NOT NULL DEFAULT 0.0000,
     
     reasoning TEXT,
     recommended_action TEXT,
     reconciled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Idempotency Keys Store Table
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    key VARCHAR(255) PRIMARY KEY,
+    status VARCHAR(50) NOT NULL DEFAULT 'IN_PROGRESS',
+    response_code INT,
+    response_body JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL
 );
 
 -- 1. Razorpay Payment Gateway Settlement Table
@@ -57,9 +67,9 @@ CREATE TABLE IF NOT EXISTS razorpay_settlements (
     payment_id VARCHAR(100) NOT NULL,
     order_id VARCHAR(100) NOT NULL,
     customer_name VARCHAR(255),
-    transaction_amount NUMERIC(15,2) NOT NULL,
-    gateway_fee NUMERIC(15,2) NOT NULL DEFAULT 0.00,
-    settlement_amount NUMERIC(15,2) NOT NULL,
+    transaction_amount NUMERIC(18,4) NOT NULL,
+    gateway_fee NUMERIC(18,4) NOT NULL DEFAULT 0.0000,
+    settlement_amount NUMERIC(18,4) NOT NULL,
     settlement_date DATE NOT NULL,
     utr_reference VARCHAR(100)
 );
@@ -71,7 +81,7 @@ CREATE TABLE IF NOT EXISTS bank_statements (
     bank_ref VARCHAR(100) NOT NULL,
     utr_number VARCHAR(100),
     value_date DATE NOT NULL,
-    credit_amount NUMERIC(15,2) NOT NULL,
+    credit_amount NUMERIC(18,4) NOT NULL,
     narration TEXT NOT NULL
 );
 
@@ -83,8 +93,8 @@ CREATE TABLE IF NOT EXISTS erp_sales_ledger (
     order_id VARCHAR(100) NOT NULL,
     customer_name VARCHAR(255),
     sales_date DATE NOT NULL,
-    expected_amount NUMERIC(15,2) NOT NULL,
-    refund_amount NUMERIC(15,2) NOT NULL DEFAULT 0.00
+    expected_amount NUMERIC(18,4) NOT NULL,
+    refund_amount NUMERIC(18,4) NOT NULL DEFAULT 0.0000
 );
 
 -- High-Performance B-Tree & Trigram Indexes

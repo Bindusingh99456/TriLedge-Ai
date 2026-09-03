@@ -1,7 +1,9 @@
 /**
- * Deterministic & Fuzzy 3-Way Financial Reconciliation Engine for LedgerSync
+ * Deterministic & Fuzzy 3-Way Financial Reconciliation Engine for TriLedger AI
+ * Enforces strict arbitrary-precision Decimal.js calculations to prevent float precision drift.
  */
 
+import { Decimal } from "decimal.js";
 import {
   BankRecord,
   ErpRecord,
@@ -12,6 +14,11 @@ import {
   ReconciledTransaction,
   ReconciliationSummary
 } from "../types";
+
+export function toDecimal(val: number | string | Decimal | undefined | null): Decimal {
+  if (val === undefined || val === null) return new Decimal(0);
+  return new Decimal(val);
+}
 
 export function perform3WayReconciliation(
   razorpayList: RazorpayRecord[],
@@ -56,9 +63,9 @@ export function perform3WayReconciliation(
     refId: string,
     date: string,
     customerName: string,
-    gross: number,
-    fee: number,
-    net: number
+    gross: Decimal,
+    fee: Decimal,
+    net: Decimal
   ): JournalEntry {
     return {
       id: `JE-2026-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -67,11 +74,11 @@ export function perform3WayReconciliation(
       referenceId: refId,
       description: `Settlement & Fee Adjustment for Order ${refId} (${customerName})`,
       debitAccount: "HDFC Bank Account A/C #9012",
-      debitAmount: net,
+      debitAmount: net.toNumber(),
       feeAccount: "Payment Gateway Charges (Razorpay)",
-      feeAmount: fee,
+      feeAmount: fee.toNumber(),
       creditAccount: "Accounts Receivable / Sales",
-      creditAmount: gross,
+      creditAmount: gross.toNumber(),
       status: "POSTED"
     };
   }
@@ -79,6 +86,10 @@ export function perform3WayReconciliation(
   // PASS 1 & 2 & 3: Deterministic matching across Razorpay Records
   for (const rzp of razorpayList) {
     if (matchedRazorpayIds.has(rzp.paymentId)) continue;
+
+    const gross = toDecimal(rzp.transactionAmount);
+    const fee = toDecimal(rzp.gatewayFee);
+    const rzpNet = gross.minus(fee);
 
     // Find linked ERP record
     const linkedErp = erpByOrderId.get(rzp.orderId);
@@ -97,11 +108,14 @@ export function perform3WayReconciliation(
       );
     }
 
-    // SCENARIO 1: Full 3-Way Net Fee Adjustment Match (The Gold Standard)
-    // ERP Amount (e.g. 12500) - Rzp Fee (250) = Bank Credit (12250)
+    // SCENARIO 1: Full 3-Way Net Fee Adjustment Match (Arbitrary Precision Decimal Match)
+    // ERP Amount (e.g. 12500.0000) - Rzp Fee (250.0000) = Bank Credit (12250.0000)
     if (linkedErp && linkedBank) {
-      const isNetMatch = Math.abs((rzp.transactionAmount - rzp.gatewayFee) - linkedBank.creditAmount) < 1;
-      const isErpMatch = Math.abs(linkedErp.expectedAmount - rzp.transactionAmount) < 1;
+      const bankCredit = toDecimal(linkedBank.creditAmount);
+      const erpExpected = toDecimal(linkedErp.expectedAmount);
+
+      const isNetMatch = rzpNet.minus(bankCredit).abs().lessThan(0.01);
+      const isErpMatch = erpExpected.minus(gross).abs().lessThan(0.01);
       
       if (isNetMatch && isErpMatch) {
         matchedRazorpayIds.add(rzp.paymentId);
@@ -112,14 +126,14 @@ export function perform3WayReconciliation(
           id: `REC-${rzp.paymentId}`,
           matchType: MatchType.FEE_ADJUSTED,
           confidenceScore: 100,
-          reasoning: `3-Way Net Match: Sales ₹${rzp.transactionAmount.toLocaleString()} - Gateway Fee ₹${rzp.gatewayFee.toLocaleString()} = Net Bank Credit ₹${linkedBank.creditAmount.toLocaleString()}. UTR matched (${rzp.utrReference}).`,
+          reasoning: `3-Way Net Match: Sales ₹${gross.toFixed(2)} - Gateway Fee ₹${fee.toFixed(2)} = Net Bank Credit ₹${bankCredit.toFixed(2)}. UTR matched (${rzp.utrReference}).`,
           razorpay: rzp,
           bank: linkedBank,
           erp: linkedErp,
-          grossAmount: rzp.transactionAmount,
-          feeDeducted: rzp.gatewayFee,
-          refundDeducted: linkedErp.refundAmount,
-          netBankReceived: linkedBank.creditAmount,
+          grossAmount: gross.toNumber(),
+          feeDeducted: fee.toNumber(),
+          refundDeducted: toDecimal(linkedErp.refundAmount).toNumber(),
+          netBankReceived: bankCredit.toNumber(),
           variance: 0,
           reconciledAt: new Date().toISOString()
         });
@@ -131,18 +145,19 @@ export function perform3WayReconciliation(
             rzp.orderId,
             rzp.settlementDate,
             rzp.customerName,
-            rzp.transactionAmount,
-            rzp.gatewayFee,
-            linkedBank.creditAmount
+            gross,
+            fee,
+            bankCredit
           )
         );
         continue;
       }
 
       // SCENARIO 2: Partial Refund Match
-      if (linkedErp.refundAmount > 0) {
-        const netAfterRefundAndFee = rzp.transactionAmount - rzp.gatewayFee - linkedErp.refundAmount;
-        if (Math.abs(netAfterRefundAndFee - linkedBank.creditAmount) < 2) {
+      const erpRefund = toDecimal(linkedErp.refundAmount);
+      if (erpRefund.greaterThan(0)) {
+        const netAfterRefundAndFee = rzpNet.minus(erpRefund);
+        if (netAfterRefundAndFee.minus(bankCredit).abs().lessThan(0.01)) {
           matchedRazorpayIds.add(rzp.paymentId);
           matchedBankRefs.add(linkedBank.bankRef);
           matchedInvoiceIds.add(linkedErp.invoiceId);
@@ -151,14 +166,14 @@ export function perform3WayReconciliation(
             id: `REC-${rzp.paymentId}`,
             matchType: MatchType.PARTIAL_REFUND,
             confidenceScore: 98,
-            reasoning: `Partial Refund Reconciliation: Sales ₹${rzp.transactionAmount.toLocaleString()} - Refund ₹${linkedErp.refundAmount.toLocaleString()} - Fee ₹${rzp.gatewayFee.toLocaleString()} = Net Bank ₹${linkedBank.creditAmount.toLocaleString()}.`,
+            reasoning: `Partial Refund Reconciliation: Sales ₹${gross.toFixed(2)} - Refund ₹${erpRefund.toFixed(2)} - Fee ₹${fee.toFixed(2)} = Net Bank ₹${bankCredit.toFixed(2)}.`,
             razorpay: rzp,
             bank: linkedBank,
             erp: linkedErp,
-            grossAmount: rzp.transactionAmount,
-            feeDeducted: rzp.gatewayFee,
-            refundDeducted: linkedErp.refundAmount,
-            netBankReceived: linkedBank.creditAmount,
+            grossAmount: gross.toNumber(),
+            feeDeducted: fee.toNumber(),
+            refundDeducted: erpRefund.toNumber(),
+            netBankReceived: bankCredit.toNumber(),
             variance: 0,
             reconciledAt: new Date().toISOString()
           });
@@ -170,11 +185,11 @@ export function perform3WayReconciliation(
             referenceId: rzp.orderId,
             description: `Partial Refund & Fee Net Adjustment for Order ${rzp.orderId}`,
             debitAccount: "HDFC Bank Account A/C #9012",
-            debitAmount: linkedBank.creditAmount,
+            debitAmount: bankCredit.toNumber(),
             feeAccount: "Payment Gateway Fee / Sales Refund",
-            feeAmount: rzp.gatewayFee + linkedErp.refundAmount,
+            feeAmount: fee.plus(erpRefund).toNumber(),
             creditAccount: "Accounts Receivable",
-            creditAmount: rzp.transactionAmount,
+            creditAmount: gross.toNumber(),
             status: "POSTED"
           });
           continue;
@@ -187,7 +202,7 @@ export function perform3WayReconciliation(
         const bankDate = new Date(linkedBank.valueDate).getTime();
         const diffDays = (bankDate - rzpDate) / (1000 * 3600 * 24);
 
-        if (diffDays >= 1 && diffDays <= 3 && Math.abs((rzp.transactionAmount - rzp.gatewayFee) - linkedBank.creditAmount) < 1) {
+        if (diffDays >= 1 && diffDays <= 3 && rzpNet.minus(bankCredit).abs().lessThan(0.01)) {
           matchedRazorpayIds.add(rzp.paymentId);
           matchedBankRefs.add(linkedBank.bankRef);
           matchedInvoiceIds.add(linkedErp.invoiceId);
@@ -200,10 +215,10 @@ export function perform3WayReconciliation(
             razorpay: rzp,
             bank: linkedBank,
             erp: linkedErp,
-            grossAmount: rzp.transactionAmount,
-            feeDeducted: rzp.gatewayFee,
+            grossAmount: gross.toNumber(),
+            feeDeducted: fee.toNumber(),
             refundDeducted: 0,
-            netBankReceived: linkedBank.creditAmount,
+            netBankReceived: bankCredit.toNumber(),
             variance: 0,
             reconciledAt: new Date().toISOString()
           });
@@ -214,9 +229,9 @@ export function perform3WayReconciliation(
               rzp.orderId,
               linkedBank.valueDate,
               rzp.customerName,
-              rzp.transactionAmount,
-              rzp.gatewayFee,
-              linkedBank.creditAmount
+              gross,
+              fee,
+              bankCredit
             )
           );
           continue;
@@ -239,9 +254,11 @@ export function perform3WayReconciliation(
         if (bank) matchedBankRefs.add(bank.bankRef);
         if (erp) matchedInvoiceIds.add(erp.invoiceId);
 
-        const gross = rzp ? rzp.transactionAmount : (erp ? erp.expectedAmount : bank.creditAmount);
-        const fee = rzp ? rzp.gatewayFee : Math.max(0, gross - bank.creditAmount);
-        const net = bank.creditAmount;
+        const gross = rzp ? toDecimal(rzp.transactionAmount) : (erp ? toDecimal(erp.expectedAmount) : toDecimal(bank.creditAmount));
+        const bankCredit = toDecimal(bank.creditAmount);
+        const fee = rzp ? toDecimal(rzp.gatewayFee) : Decimal.max(0, gross.minus(bankCredit));
+        const erpRefund = erp ? toDecimal(erp.refundAmount) : new Decimal(0);
+        const variance = gross.minus(fee).minus(bankCredit);
 
         reconciled.push({
           id: `REC-AI-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -251,11 +268,11 @@ export function perform3WayReconciliation(
           razorpay: rzp,
           bank,
           erp,
-          grossAmount: gross,
-          feeDeducted: fee,
-          refundDeducted: erp ? erp.refundAmount : 0,
-          netBankReceived: net,
-          variance: gross - fee - net,
+          grossAmount: gross.toNumber(),
+          feeDeducted: fee.toNumber(),
+          refundDeducted: erpRefund.toNumber(),
+          netBankReceived: bankCredit.toNumber(),
+          variance: variance.toNumber(),
           reconciledAt: new Date().toISOString()
         });
 
@@ -267,7 +284,7 @@ export function perform3WayReconciliation(
             rzp ? rzp.customerName : (erp ? erp.customerName : "Fuzzy Customer"),
             gross,
             fee,
-            net
+            bankCredit
           )
         );
       }
@@ -275,26 +292,33 @@ export function perform3WayReconciliation(
   }
 
   // PASS 5: Honest Exception Breakdown for remaining unmatched items
-  // Check unmatched Razorpay items
   for (const rzp of razorpayList) {
     if (matchedRazorpayIds.has(rzp.paymentId)) continue;
 
-    const linkedBank = bankList.find(b => !matchedBankRefs.has(b.bankRef) && Math.abs(b.creditAmount - rzp.settlementAmount) < 1);
+    const gross = toDecimal(rzp.transactionAmount);
+    const fee = toDecimal(rzp.gatewayFee);
+    const settlementAmt = toDecimal(rzp.settlementAmount);
+
+    const linkedBank = bankList.find(b => !matchedBankRefs.has(b.bankRef) && toDecimal(b.creditAmount).minus(settlementAmt).abs().lessThan(0.01));
     const linkedErp = erpByOrderId.get(rzp.orderId);
 
     let exceptionType = ExceptionType.MISSING_BANK_ENTRY;
-    let reasoning = `Missing Bank Credit: Razorpay payment ${rzp.paymentId} for ₹${rzp.transactionAmount.toLocaleString()} has no matching UTR credit in bank statements.`;
+    let reasoning = `Missing Bank Credit: Razorpay payment ${rzp.paymentId} for ₹${gross.toFixed(2)} has no matching UTR credit in bank statements.`;
     let recommendedAction = "Contact bank acquiring partner to trace settlement UTR and verify payout status.";
 
-    if (linkedBank && Math.abs(rzp.settlementAmount - linkedBank.creditAmount) > 10) {
+    const bankCredit = linkedBank ? toDecimal(linkedBank.creditAmount) : new Decimal(0);
+
+    if (linkedBank && settlementAmt.minus(bankCredit).abs().greaterThan(10)) {
       exceptionType = ExceptionType.FEE_DISCREPANCY;
-      reasoning = `Unexplained Fee Discrepancy: Expected bank credit ₹${rzp.settlementAmount.toLocaleString()}, but bank received ₹${linkedBank.creditAmount.toLocaleString()} (Delta: ₹${Math.abs(rzp.settlementAmount - linkedBank.creditAmount)}).`;
+      reasoning = `Unexplained Fee Discrepancy: Expected bank credit ₹${settlementAmt.toFixed(2)}, but bank received ₹${bankCredit.toFixed(2)} (Delta: ₹${settlementAmt.minus(bankCredit).abs().toFixed(2)}).`;
       recommendedAction = "Auditor manual review required: Check for additional merchant chargebacks or GST fee adjustments.";
     } else if (!linkedErp) {
       exceptionType = ExceptionType.UNMATCHED_ERP_RECORD;
       reasoning = `Unmatched ERP Record: Gateway captured payment ${rzp.paymentId}, but internal sales ERP has no record of Order ${rzp.orderId}.`;
       recommendedAction = "Verify if order was placed via guest checkout or custom API integration missing from main ledger.";
     }
+
+    const variance = gross.minus(fee).minus(bankCredit);
 
     reconciled.push({
       id: `EXC-RZP-${rzp.paymentId}`,
@@ -304,11 +328,11 @@ export function perform3WayReconciliation(
       razorpay: rzp,
       bank: linkedBank,
       erp: linkedErp,
-      grossAmount: rzp.transactionAmount,
-      feeDeducted: rzp.gatewayFee,
+      grossAmount: gross.toNumber(),
+      feeDeducted: fee.toNumber(),
       refundDeducted: 0,
-      netBankReceived: linkedBank ? linkedBank.creditAmount : 0,
-      variance: rzp.transactionAmount - rzp.gatewayFee - (linkedBank ? linkedBank.creditAmount : 0),
+      netBankReceived: bankCredit.toNumber(),
+      variance: variance.toNumber(),
       exceptionType,
       exceptionResolution: "Pending Auditor Review",
       recommendedAction,
@@ -321,19 +345,21 @@ export function perform3WayReconciliation(
   for (const b of bankList) {
     if (matchedBankRefs.has(b.bankRef)) continue;
 
+    const bankCredit = toDecimal(b.creditAmount);
+
     reconciled.push({
       id: `EXC-BNK-${b.bankRef}`,
       matchType: MatchType.EXCEPTION_UNRESOLVED,
       confidenceScore: 25,
-      reasoning: `Unidentified Bank Credit: Bank statement lists credit of ₹${b.creditAmount.toLocaleString()} (${b.description}), but no corresponding Razorpay settlement or ERP order exists.`,
+      reasoning: `Unidentified Bank Credit: Bank statement lists credit of ₹${bankCredit.toFixed(2)} (${b.description}), but no corresponding Razorpay settlement or ERP order exists.`,
       razorpay: undefined,
       bank: b,
       erp: undefined,
-      grossAmount: b.creditAmount,
+      grossAmount: bankCredit.toNumber(),
       feeDeducted: 0,
       refundDeducted: 0,
-      netBankReceived: b.creditAmount,
-      variance: b.creditAmount,
+      netBankReceived: bankCredit.toNumber(),
+      variance: bankCredit.toNumber(),
       exceptionType: ExceptionType.MISSING_BANK_ENTRY,
       exceptionResolution: "Unclaimed Bank Credit",
       recommendedAction: "Check wire transfers or direct NEFT/RTGS credits bypass of Razorpay gateway.",
@@ -342,12 +368,12 @@ export function perform3WayReconciliation(
     });
   }
 
-  // Calculate Summary Metrics
+  // Calculate Summary Metrics with Arbitrary Precision Decimal Accumulators
   const totalRecordsProcessed = razorpayList.length + bankList.length + erpList.length;
-  let totalGrossVolume = 0;
-  let totalNetBankCredit = 0;
-  let totalGatewayFeesAudited = 0;
-  let totalVarianceAmount = 0;
+  let totalGrossVolumeDecimal = new Decimal(0);
+  let totalNetBankCreditDecimal = new Decimal(0);
+  let totalGatewayFeesAuditedDecimal = new Decimal(0);
+  let totalVarianceAmountDecimal = new Decimal(0);
 
   let exactMatchCount = 0;
   let utrMatchCount = 0;
@@ -359,12 +385,12 @@ export function perform3WayReconciliation(
 
   for (const r of reconciled) {
     if (r.matchType !== MatchType.EXCEPTION_UNRESOLVED) {
-      totalGrossVolume += r.grossAmount;
-      totalNetBankCredit += r.netBankReceived;
-      totalGatewayFeesAudited += r.feeDeducted;
+      totalGrossVolumeDecimal = totalGrossVolumeDecimal.plus(toDecimal(r.grossAmount));
+      totalNetBankCreditDecimal = totalNetBankCreditDecimal.plus(toDecimal(r.netBankReceived));
+      totalGatewayFeesAuditedDecimal = totalGatewayFeesAuditedDecimal.plus(toDecimal(r.feeDeducted));
     } else {
       exceptionCount++;
-      totalVarianceAmount += Math.abs(r.variance);
+      totalVarianceAmountDecimal = totalVarianceAmountDecimal.plus(toDecimal(r.variance).abs());
     }
 
     if (r.matchType === MatchType.EXACT_MATCH) exactMatchCount++;
@@ -380,9 +406,9 @@ export function perform3WayReconciliation(
 
   const summary: ReconciliationSummary = {
     totalRecordsProcessed,
-    totalGrossVolume,
-    totalNetBankCredit,
-    totalGatewayFeesAudited,
+    totalGrossVolume: totalGrossVolumeDecimal.toNumber(),
+    totalNetBankCredit: totalNetBankCreditDecimal.toNumber(),
+    totalGatewayFeesAudited: totalGatewayFeesAuditedDecimal.toNumber(),
     exactMatchCount,
     utrMatchCount,
     feeAdjustedCount,
@@ -391,7 +417,7 @@ export function perform3WayReconciliation(
     aiFuzzyMatchedCount,
     exceptionCount,
     matchRatePercentage,
-    totalVarianceAmount,
+    totalVarianceAmount: totalVarianceAmountDecimal.toNumber(),
     journalEntriesGenerated: journalEntries.length
   };
 

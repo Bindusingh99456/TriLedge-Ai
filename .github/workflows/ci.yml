@@ -8,8 +8,24 @@ on:
 
 jobs:
   lint-typecheck-test:
-    name: 🛡️ Code Quality, Typecheck & Synthetic Seed Test
+    name: 🛡️ Code Quality, Typecheck & Postgres Integration Test
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: triledger_test
+          POSTGRES_USER: triledger_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -25,6 +41,14 @@ jobs:
 
       - name: Run TypeScript Linter & Static Type Analysis
         run: npm run lint
+
+      - name: Execute PostgreSQL Database Schema Migrations
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          PGPASSWORD=test_password psql -h localhost -U triledger_user -d triledger_test -f schema.sql
+
+      - name: Run Integration Tests (Row-Lock Concurrency & Decimal Math & DLQ)
+        run: npm run test
 
       - name: Verify Synthetic Data Generator & Seed Script
         run: npm run seed
@@ -52,4 +76,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
-          tags: ledgersync-app:ci-latest
+          tags: triledger-app:ci-latest

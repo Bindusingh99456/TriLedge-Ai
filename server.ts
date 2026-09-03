@@ -1,10 +1,13 @@
 import express from "express";
+import http from "http";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
 import { logStructured } from "./src/utils/logger.js";
 import { CacheAsideService } from "./src/server/cache.js";
 import { openApiSpec, renderSwaggerUiHtml } from "./src/server/swagger.js";
+import { idempotencyMiddleware } from "./src/server/idempotency.js";
+import { geminiCircuitBreaker } from "./src/server/circuitBreaker.js";
+import { dlqService } from "./src/server/dlq.js";
 
 const app = express();
 const PORT = 3000;
@@ -69,7 +72,8 @@ app.get("/ready", (req, res) => {
       components: {
         database: "healthy",
         redisCache: "healthy",
-        matchingEngine: "healthy"
+        matchingEngine: "healthy",
+        circuitBreaker: geminiCircuitBreaker.opened ? "open" : "healthy"
       },
       timestamp: new Date().toISOString()
     });
@@ -81,12 +85,48 @@ app.get("/ready", (req, res) => {
   }
 });
 
+// Dead-Letter Queue (DLQ) Management Endpoints
+app.get("/api/dlq", async (req, res) => {
+  try {
+    const queue = await dlqService.getQueue();
+    res.json({ success: true, count: queue.length, items: queue });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/dlq/:id/retry", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await dlqService.retryItem(id, async (item) => {
+      // Retry via Gemini Circuit Breaker
+      const auditRes = await geminiCircuitBreaker.fire(item.payload);
+      return auditRes.auditStatus === "SUCCESS";
+    });
+
+    res.json({ success: result.success, item: result.item, error: result.error });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete("/api/dlq/purge", async (req, res) => {
+  try {
+    const purgedCount = await dlqService.purgeResolved();
+    res.json({ success: true, purgedCount });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Apply Idempotency Middleware to Financial Settlement Mutation Endpoints
+app.use(["/api/reconcile-batch", "/api/settlements"], idempotencyMiddleware({ required: false, ttlSeconds: 120 }));
+
 // Phase 2: Redis Cache-Aside Pattern Endpoint (/api/stats)
 app.get("/api/stats", async (req, res) => {
   const traceId = req.headers["x-trace-id"] as string;
   try {
     const { data, source } = await CacheAsideService.getOrSet("summary:org_default", 60, async () => {
-      // Emulate DB aggregation query
       return {
         totalVolume: 1845200.50,
         exactMatchCount: 84,
@@ -105,12 +145,11 @@ app.get("/api/stats", async (req, res) => {
 });
 
 // Phase 2: Concurrency Control & Row-Level Locking Simulation (/api/reconcile-batch)
-// Uses optimistic concurrency tokens & lock emulation to prevent race conditions during high-volume settlements
 const activeBatchLocks = new Set<string>();
 
 app.post("/api/reconcile-batch", async (req, res) => {
   const traceId = req.headers["x-trace-id"] as string;
-  const { batchId, transactionIds, concurrencyToken } = req.body;
+  const { batchId, transactionIds } = req.body;
 
   if (!batchId) {
     return res.status(400).json({ success: false, error: "Missing required batchId parameter" });
@@ -189,84 +228,32 @@ app.get("/api/stream/reconciliation-logs", (req, res) => {
   });
 });
 
-// AI Fuzzy Reconciliation & Exception Audit Endpoint
+// AI Fuzzy Reconciliation & Exception Audit Endpoint (Protected with Opossum Circuit Breaker & DLQ)
 app.post("/api/reconcile-ai", async (req, res) => {
   const traceId = req.headers["x-trace-id"] as string;
   try {
     const { unmatchedRazorpay, unmatchedBank, unmatchedErp } = req.body;
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      logStructured("warn", "GEMINI_API_KEY not found in environment. Using fallback heuristics.", { traceId });
-      return res.json({
-        success: true,
-        source: "heuristic-fallback",
-        matches: [
-          {
-            razorpayId: "pay_RZP_00119",
-            bankRef: "BNK-2026-9019",
-            invoiceId: "INV-2026-1019",
-            confidence: 94,
-            reasoning: "Matched via fuzzy customer name 'Karan Chopra' and bank reference 'NEFT/INV1019' matching ERP Invoice INV-2026-1019 for ₹23,500."
-          }
-        ]
-      });
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
-
-    const prompt = `
-You are a Senior Forensic Accountant and AI Financial Reconciliation Engine for LedgerSync.
-Analyze these unmatched 3-way financial transaction records:
-
-Unmatched Razorpay Records:
-${JSON.stringify(unmatchedRazorpay, null, 2)}
-
-Unmatched Bank Statement Records:
-${JSON.stringify(unmatchedBank, null, 2)}
-
-Unmatched ERP Sales Records:
-${JSON.stringify(unmatchedErp, null, 2)}
-
-Task:
-Identify fuzzy semantic matches between these records (e.g. matching truncated invoice IDs, UTR references embedded in bank text, customer name variations, or net gateway fee deductions).
-Return ONLY a valid JSON array of match objects without any markdown text wrappers.
-
-Required JSON format:
-[
-  {
-    "razorpayId": "pay_RZP_XXXXX",
-    "bankRef": "BNK-XXXX-XXXX",
-    "invoiceId": "INV-XXXX-XXXX",
-    "confidence": 95,
-    "reasoning": "Clear explanation of why this is a match"
-  }
-]
-`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
-      }
+    // Call through Opossum Circuit Breaker
+    const auditResponse = await geminiCircuitBreaker.fire({
+      razorpayRecord: unmatchedRazorpay?.[0],
+      bankRecord: unmatchedBank?.[0],
+      erpRecord: unmatchedErp?.[0],
+      varianceAmount: 250
     });
 
-    const responseText = response.text || "[]";
-    let matches = [];
-    try {
-      matches = JSON.parse(responseText);
-    } catch (parseErr) {
-      logStructured("error", "Error parsing Gemini JSON output", { traceId, responseText, error: (parseErr as Error).message });
-      matches = [];
-    }
-
-    logStructured("info", "Successfully completed Gemini AI fuzzy match", { traceId, matchesCount: matches.length });
+    logStructured("info", "Successfully processed AI fuzzy reconciliation request via Circuit Breaker", {
+      traceId,
+      status: auditResponse.auditStatus
+    });
 
     return res.json({
       success: true,
-      source: "gemini-2.5-flash",
-      matches
+      source: "gemini-2.5-flash-circuit-breaker",
+      auditStatus: auditResponse.auditStatus,
+      confidence: auditResponse.confidence,
+      reasoning: auditResponse.reasoning,
+      recommendedAction: auditResponse.recommendedAction
     });
   } catch (err: any) {
     logStructured("error", "AI Reconciliation endpoint error", { traceId, error: err.message });
@@ -276,7 +263,6 @@ Required JSON format:
     });
   }
 });
-
 
 async function startServer() {
   // Vite middleware for development
@@ -297,9 +283,45 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`LedgerSync server running on http://localhost:${PORT}`);
+  const server = http.createServer(app);
+
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`TriLedger AI server running on http://localhost:${PORT}`);
   });
+
+  // Graceful Shutdown & Connection Draining Handler
+  const gracefulShutdown = (signal: string) => {
+    console.log(`\n🛑 Received ${signal}. Initiating Graceful Shutdown & Connection Draining...`);
+    
+    server.close(async (err) => {
+      if (err) {
+        console.error("Error while closing Express HTTP server:", err);
+      } else {
+        console.log("✅ Express HTTP server stopped accepting new incoming requests.");
+      }
+
+      // Cleanup caches & in-flight locks
+      try {
+        CacheAsideService.clearAll();
+        activeBatchLocks.clear();
+        console.log("✅ In-flight locks released & cache buffers flushed.");
+      } catch (cleanupErr) {
+        console.error("Error cleaning up resources during shutdown:", cleanupErr);
+      }
+
+      console.log("👋 TriLedger AI server process terminated cleanly.");
+      process.exit(0);
+    });
+
+    // Fallback force kill timeout after 5 seconds
+    setTimeout(() => {
+      console.error("⚠️ Force shutdown timeout (5s) reached. Killing process.");
+      process.exit(1);
+    }, 5000);
+  };
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 }
 
 startServer();
