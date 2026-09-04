@@ -20,6 +20,7 @@ interface NavbarProps {
   matchRate: number;
   onOpenSseDrawer?: () => void;
   onOpenDlqModal?: () => void;
+  onOpenSecurityVault?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -30,7 +31,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onExportReport,
   matchRate,
   onOpenSseDrawer,
-  onOpenDlqModal
+  onOpenDlqModal,
+  onOpenSecurityVault
 }) => {
   const [systemReady, setSystemReady] = React.useState(true);
 
@@ -98,6 +100,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <span className="w-2 h-2 rounded-full bg-amber-400" />
             <span className="font-medium">DLQ Queue & Circuit Breaker</span>
+          </button>
+
+          <button
+            onClick={onOpenSecurityVault}
+            className="flex items-center space-x-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-md px-3 py-1.5 text-xs transition cursor-pointer text-emerald-300 font-medium"
+            title="Open Security & Cryptographic Vault Inspector"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Security Vault</span>
           </button>
 
           <div className="flex items-center space-x-2 bg-slate-800/90 border border-slate-700 rounded-md px-3.5 py-1.5 text-xs">

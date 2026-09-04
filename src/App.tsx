@@ -18,6 +18,7 @@ import { CsvUploadModal } from "./components/CsvUploadModal";
 import { Toast } from "./components/Toast";
 import { LiveSseLogsDrawer } from "./components/LiveSseLogsDrawer";
 import { DlqModal } from "./components/DlqModal";
+import { SecurityVaultModal } from "./components/SecurityVaultModal";
 
 import {
   ListFilter,
@@ -59,6 +60,7 @@ export default function App() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isSseOpen, setIsSseOpen] = useState(false);
   const [isDlqOpen, setIsDlqOpen] = useState(false);
+  const [isSecurityVaultOpen, setIsSecurityVaultOpen] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -245,6 +247,7 @@ export default function App() {
         matchRate={summary.matchRatePercentage}
         onOpenSseDrawer={() => setIsSseOpen(true)}
         onOpenDlqModal={() => setIsDlqOpen(true)}
+        onOpenSecurityVault={() => setIsSecurityVaultOpen(true)}
       />
 
       {/* Main Container */}
@@ -349,6 +352,12 @@ export default function App() {
       <DlqModal
         isOpen={isDlqOpen}
         onClose={() => setIsDlqOpen(false)}
+      />
+
+      {/* Security & Cryptographic Vault Modal */}
+      <SecurityVaultModal
+        isOpen={isSecurityVaultOpen}
+        onClose={() => setIsSecurityVaultOpen(false)}
       />
 
       {/* Footer */}

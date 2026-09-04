@@ -27,6 +27,7 @@ export const ExceptionsQueue: React.FC<ExceptionsQueueProps> = ({
   onResolveException
 }) => {
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [issueTypeFilter, setIssueTypeFilter] = React.useState("ALL");
 
   const formatINR = (num: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -37,6 +38,15 @@ export const ExceptionsQueue: React.FC<ExceptionsQueueProps> = ({
   };
 
   const filteredExceptions = exceptions.filter(ex => {
+    // Filter by specific issue type
+    if (issueTypeFilter !== "ALL") {
+      if (issueTypeFilter === ExceptionType.MISSING_BANK_ENTRY && ex.exceptionType !== ExceptionType.MISSING_BANK_ENTRY) return false;
+      if (issueTypeFilter === ExceptionType.FEE_DISCREPANCY && ex.exceptionType !== ExceptionType.FEE_DISCREPANCY) return false;
+      if (issueTypeFilter === ExceptionType.AMOUNT_MISMATCH && ex.exceptionType !== ExceptionType.AMOUNT_MISMATCH) return false;
+      if (issueTypeFilter === ExceptionType.REFUND_OVERAGE && ex.exceptionType !== ExceptionType.REFUND_OVERAGE) return false;
+      if (issueTypeFilter === ExceptionType.UNMATCHED_ERP_RECORD && ex.exceptionType !== ExceptionType.UNMATCHED_ERP_RECORD) return false;
+    }
+
     const q = searchTerm.toLowerCase();
     return (
       ex.id.toLowerCase().includes(q) ||
@@ -67,8 +77,25 @@ export const ExceptionsQueue: React.FC<ExceptionsQueueProps> = ({
           </p>
         </div>
 
-        {/* AI Retry & Search */}
-        <div className="flex items-center space-x-3">
+        {/* AI Retry & Search & Dropdown */}
+        <div className="flex flex-wrap items-center gap-3">
+          
+          {/* Specific Payment Issue Selector */}
+          <div className="relative">
+            <select
+              value={issueTypeFilter}
+              onChange={(e) => setIssueTypeFilter(e.target.value)}
+              className="bg-amber-50/50 border border-amber-300 rounded-lg px-3 py-1.5 text-xs text-amber-900 font-medium focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm"
+            >
+              <option value="ALL">🔍 All Exception Issue Types</option>
+              <option value={ExceptionType.MISSING_BANK_ENTRY}>⚠️ Missing Bank Statement Credit</option>
+              <option value={ExceptionType.FEE_DISCREPANCY}>💸 Gateway Fee Discrepancy</option>
+              <option value={ExceptionType.AMOUNT_MISMATCH}>❌ Gross Amount Mismatch</option>
+              <option value={ExceptionType.REFUND_OVERAGE}>🔄 Refund Deducted Exceeds Sales</option>
+              <option value={ExceptionType.UNMATCHED_ERP_RECORD}>📄 Unmatched ERP Sales Invoice</option>
+            </select>
+          </div>
+
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
@@ -76,7 +103,7 @@ export const ExceptionsQueue: React.FC<ExceptionsQueueProps> = ({
               placeholder="Search unmatched payments..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 w-48 sm:w-64"
+              className="bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 w-44 sm:w-56"
             />
           </div>
 

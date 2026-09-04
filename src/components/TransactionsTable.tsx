@@ -29,6 +29,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   onFilterChange
 }) => {
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [issueCategoryFilter, setIssueCategoryFilter] = React.useState("ALL");
   const [explainingTx, setExplainingTx] = React.useState<ReconciledTransaction | null>(null);
 
   const formatINR = (num: number) => {
@@ -40,13 +41,23 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   };
 
   const filteredList = reconciled.filter(item => {
-    // Filter by match type
+    // Filter by match type tab
     if (activeFilter !== "ALL") {
       if (activeFilter === "EXCEPTIONS" && item.matchType !== MatchType.EXCEPTION_UNRESOLVED) return false;
       if (activeFilter === "FEE_ADJUSTED" && item.matchType !== MatchType.FEE_ADJUSTED && item.matchType !== MatchType.EXACT_MATCH) return false;
       if (activeFilter === "DELAYED" && item.matchType !== MatchType.DELAYED_SETTLEMENT) return false;
       if (activeFilter === "REFUND" && item.matchType !== MatchType.PARTIAL_REFUND) return false;
       if (activeFilter === "AI_FUZZY" && item.matchType !== MatchType.AI_FUZZY_MATCHED) return false;
+    }
+
+    // Filter by specific Issue Category Dropdown
+    if (issueCategoryFilter !== "ALL") {
+      if (issueCategoryFilter === "MISSING_BANK" && item.bank) return false;
+      if (issueCategoryFilter === "FEE_DISCREPANCY" && item.matchType !== MatchType.FEE_ADJUSTED) return false;
+      if (issueCategoryFilter === "PARTIAL_REFUND" && item.matchType !== MatchType.PARTIAL_REFUND) return false;
+      if (issueCategoryFilter === "DELAYED_DEPOSIT" && item.matchType !== MatchType.DELAYED_SETTLEMENT) return false;
+      if (issueCategoryFilter === "AI_MATCH" && item.matchType !== MatchType.AI_FUZZY_MATCHED) return false;
+      if (issueCategoryFilter === "UNRESOLVED" && item.matchType !== MatchType.EXCEPTION_UNRESOLVED) return false;
     }
 
     // Filter by search query
@@ -139,6 +150,23 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
         {/* Search & Filters */}
         <div className="flex flex-wrap items-center gap-2">
           
+          {/* Payment Issue Category Dropdown */}
+          <div className="relative">
+            <select
+              value={issueCategoryFilter}
+              onChange={(e) => setIssueCategoryFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm"
+            >
+              <option value="ALL">🔍 All Payment Issues & Types</option>
+              <option value="MISSING_BANK">⚠️ Missing Bank Deposit Credit</option>
+              <option value="FEE_DISCREPANCY">💸 Gateway Fee Deduction Discrepancy</option>
+              <option value="PARTIAL_REFUND">🔄 Partial Refund Deduction Variance</option>
+              <option value="DELAYED_DEPOSIT">⏱️ Delayed Deposit (T+2 / T+3)</option>
+              <option value="AI_MATCH">🤖 AI Fuzzy Pattern Match</option>
+              <option value="UNRESOLVED">🚨 Unmatched Exception Required</option>
+            </select>
+          </div>
+
           {/* Search Box */}
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -147,7 +175,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
               placeholder="Search Payment ID, UTR, Order..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-52 sm:w-64"
+              className="bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-48 sm:w-56"
             />
           </div>
 

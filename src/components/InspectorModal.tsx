@@ -78,7 +78,7 @@ export const InspectorModal: React.FC<InspectorModalProps> = ({ transaction, onC
                 {transaction.matchType === MatchType.AI_FUZZY_MATCHED && <Sparkles className="w-4 h-4 text-indigo-600" />}
                 Match Type: {transaction.matchType.replace(/_/g, ' ')}
               </span>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 shadow-sm text-slate-800">
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-white border border-slate-200 shadow-sm text-slate-800">
                 Confidence: {transaction.confidenceScore}%
               </span>
             </div>
@@ -91,6 +91,98 @@ export const InspectorModal: React.FC<InspectorModalProps> = ({ transaction, onC
                 {transaction.recommendedAction}
               </div>
             )}
+          </div>
+
+          {/* Main Payment Events Chronological Timeline */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center space-x-2">
+              <Clock className="w-4 h-4 text-indigo-600" />
+              <span>Main Payment Lifecycle Events & Timeline</span>
+            </h4>
+
+            <div className="relative border-l-2 border-indigo-200 ml-3 pl-5 space-y-4 text-xs">
+              
+              {/* Event 1 */}
+              <div className="relative">
+                <span className="absolute -left-[27px] top-0.5 w-3.5 h-3.5 rounded-full bg-indigo-600 ring-4 ring-indigo-100" />
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-bold text-slate-900">1. Online Payment Initiated & Captured</p>
+                    <p className="text-slate-600 font-mono text-[11px]">
+                      Payment ID: <span className="text-indigo-700 font-bold">{transaction.razorpay?.paymentId || "MISSING"}</span> • Customer: {transaction.razorpay?.customerName || transaction.erp?.customerName || "N/A"}
+                    </p>
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-500">{transaction.razorpay?.settlementDate || "2026-03-01"}</span>
+                </div>
+              </div>
+
+              {/* Event 2 */}
+              <div className="relative">
+                <span className="absolute -left-[27px] top-0.5 w-3.5 h-3.5 rounded-full bg-indigo-600 ring-4 ring-indigo-100" />
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-bold text-slate-900">2. Gateway Fee & Commission Deducted</p>
+                    <p className="text-slate-600 text-[11px]">
+                      Gross: {formatINR(transaction.grossAmount)} - Gateway Fee ({formatINR(transaction.feeDeducted)}) = Net Settlement {formatINR(transaction.grossAmount - transaction.feeDeducted)}
+                    </p>
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-500">Calculated</span>
+                </div>
+              </div>
+
+              {/* Event 3 */}
+              <div className="relative">
+                <span className={`absolute -left-[27px] top-0.5 w-3.5 h-3.5 rounded-full ring-4 ${
+                  transaction.bank ? "bg-emerald-600 ring-emerald-100" : "bg-amber-500 ring-amber-100"
+                }`} />
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-bold text-slate-900">3. Bank Nodal Deposit & Credit</p>
+                    <p className="text-slate-600 font-mono text-[11px]">
+                      {transaction.bank ? (
+                        <>Bank Ref: <strong className="text-slate-900">{transaction.bank.bankRef}</strong> • UTR: <strong className="text-indigo-700">{transaction.bank.utrNumber || "N/A"}</strong> • Credit: <strong className="text-emerald-700">{formatINR(transaction.bank.creditAmount)}</strong></>
+                      ) : (
+                        <span className="text-amber-700 font-semibold font-sans">⚠️ Bank Statement Credit Not Ingested Yet</span>
+                      )}
+                    </p>
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-500">{transaction.bank?.valueDate || "Pending"}</span>
+                </div>
+              </div>
+
+              {/* Event 4 */}
+              <div className="relative">
+                <span className="absolute -left-[27px] top-0.5 w-3.5 h-3.5 rounded-full bg-indigo-600 ring-4 ring-indigo-100" />
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-bold text-slate-900">4. ERP Sales Ledger & Invoice Association</p>
+                    <p className="text-slate-600 font-mono text-[11px]">
+                      Invoice: <span className="text-slate-900 font-bold">{transaction.erp?.invoiceId || "UNMATCHED"}</span> • Expected Sales: {formatINR(transaction.erp?.expectedAmount || transaction.grossAmount)}
+                    </p>
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-500">{transaction.erp?.salesDate || "Synced"}</span>
+                </div>
+              </div>
+
+              {/* Event 5 */}
+              <div className="relative">
+                <span className={`absolute -left-[27px] top-0.5 w-3.5 h-3.5 rounded-full ring-4 ${
+                  transaction.variance === 0 ? "bg-emerald-600 ring-emerald-100" : "bg-rose-600 ring-rose-100"
+                }`} />
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-bold text-slate-900">5. 3-Way Reconciled Audit Status</p>
+                    <p className="text-slate-600 text-[11px]">
+                      Result: <span className={`font-bold ${transaction.variance === 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {transaction.variance === 0 ? "100% Balanced & Verified" : `Variance Flagged: ${formatINR(transaction.variance)} difference`}
+                      </span>
+                    </p>
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-500">{new Date(transaction.reconciledAt).toLocaleTimeString()}</span>
+                </div>
+              </div>
+
+            </div>
           </div>
 
           {/* 3-Way Side-by-Side Cards */}
